@@ -267,7 +267,7 @@ def main():
             "end_time": end_time.strftime("%Y-%m-%d %H:%M:%S"),
             "api_tokens_used": general_config["openai_max_tokens"] * 5,
             "token_cost": (general_config["openai_max_tokens"] * 5) * general_config["token_cost_per_thousand"] / 1000,
-            "img1": "1.png", "img2": "2.png", "img3":"3.png", "midPrompt": imagePromptMidj
+            "img1": "1.png", "img2": "2.png", "img3":"3.png", "midPrompt": imagePromptMidj,"doneImg":"","uploaded":""
         }
         save_csv_record(csv_path, record_data)
          # Mark Title as Done

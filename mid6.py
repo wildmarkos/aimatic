@@ -22,21 +22,35 @@ FEATURE> WHEN THE IMAGE GENERATION PROCESS IS DONE SAVE IN articles_summary.csv
 # Configuration variables
 TIMEOUT = 9999999999990
 
+
 # Read credentials from settings.conf
 config = configparser.ConfigParser()
 config.read("settings-midjourney.conf")
 username = config.get("credentials", "username")
 password = config.get("credentials", "password")
 
-# Read tasks from articles_summary.csv if are not done
+# Read tasks from articles_summary.csv if are not done, to know read row[11] for "done" only then add to the tasks list
 tasks = []
 with open("articles_summary.csv", "r", newline="") as csvfile:
     reader = csv.reader(csvfile)
     next(reader, None)  # skip the header
+
     for row in reader:
-        if len(row) >= 2 :  # Check if the row has at least 2 columns
-            tasks.append({"title": row[0], "folder": row[1], "img1": row[7], "img2": row[8], "img3": row[9], "midPrompt": row[10]})
-            print(tasks)
+        print(row)
+        print("---------------------------------    -------------------------   --------------------------- ")
+        #print row index and data
+        #for i in range(len(row)):
+            #print(f"adding task, entered for loop and for i in range(len({i}))")
+            #print(i, row[i])
+                    
+        # get row only if doesnt have "done" in row[11] and len(row) >= 2        
+        if row==[] or row[11] == "done":
+            continue
+        else:
+            print("adding task" + row[0])
+            tasks.append({"title": row[0], "folder": row[1], "img1": row[7], "img2": row[8], "img3": row[9], "midPrompt": row[10], "done": row[11]})
+#print number of tasks total
+print(f"total tasks loaded: {len(tasks)}")
 
 # Initialize Selenium WebDriver
 driver = webdriver.Chrome()
@@ -105,7 +119,7 @@ for task in tasks:
         button = driver.find_element(By.XPATH, button_xpath)
         driver.execute_script("arguments[0].click();", button)
         print(f"Pressed button {i}")
-        time.sleep(1)  # Add a delay between button clicks
+        time.sleep(3)  # Add a delay between button clicks
 
     print("dreaming 10s")
     time.sleep(10)
@@ -126,6 +140,8 @@ for task in tasks:
             image_urls.append(image_url)
             print(f"Found image URL: {image_url}")
 
+        
+
     # Save the images in the output folder
     for i, image_url in enumerate(image_urls):
         response = requests.get(image_url)
@@ -134,6 +150,18 @@ for task in tasks:
             with open(f"{task['folder']}/{image_name}", "wb") as output_file:
                 output_file.write(response.content)
             print(f"Image {i + 1} saved as {image_name}")
+
+    # Mark the task as done in the articles_sumary.csv file in the line that was the current task in row[11]
+    with open( "articles_sumary.csv", "r") as input_file:
+        lines = input_file.readlines()
+    with open("tasks.csv", "w") as output_file:
+        for i, line in enumerate(lines):
+            if i == tasks.index(task):
+                line = line[:-1] + "done"
+                output_file.write(line) 
+            
+
+
 
     print("All tasks completed.")
 driver.quit()
