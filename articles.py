@@ -69,7 +69,7 @@ def create_article_folder(article_name: str) -> str:
         article_id = 1
 
     # Create the folder
-    folder_path = f"articles/{article_id}-{article_name}"
+    folder_path = f"articles/{article_id}"
     Path(folder_path).mkdir(parents=True, exist_ok=True)
 
     return folder_path, article_id, article_name
@@ -77,7 +77,7 @@ def create_article_folder(article_name: str) -> str:
 
 
 def save_article(folder_path: str, article_id: str, article_name: str, content: str, format: str):
-    file_path = f"{folder_path}/{article_id}-{article_name}.{format}"
+    file_path = f"{folder_path}/{article_id}.{format}"
     with open(file_path, "w", encoding="utf-8") as file:
         file.write(content)
 
@@ -129,8 +129,8 @@ def call_openai_api(api_key, prompt, model, max_tokens, temperature):
 
 def extract_related_questions(response: Dict) -> List[str]:
     related_questions_data = response.get("related_questions", [])
-    related_questions = [question for question in related_questions_data][:1]
-    return related_questions[:3]
+    related_questions = [question for question in related_questions_data][:5]
+    return related_questions[:max(3, len(related_questions))]
 
 
 def setup_logging():
@@ -142,7 +142,7 @@ def setup_logging():
 def save_csv_record(csv_path, data):
     file_exists = os.path.isfile(csv_path)
     with open(csv_path, "a", newline='') as csvfile:
-        fieldnames = ["title", "folder", "filename", "start_time", "end_time", "api_tokens_used", "token_cost", "img1", "img2", "img3", "midPrompt"]
+        fieldnames = ["title", "folder", "filename", "start_time", "end_time", "api_tokens_used", "token_cost", "img1", "img2", "img3", "midPrompt","doneImg","uploaded"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         if not file_exists:
             writer.writeheader()
@@ -176,11 +176,6 @@ def main():
         #article_id, article_name = title.split("-", 1)
         folder_path, article_id, article_name = create_article_folder(title)
 
-        # Call the ValueSERP API
-        valueserp_response = call_valueserp_api(api_key=valueserp_api_key, query=QUERY, location=LOCATION)
-        # Extract related questions
-        related_questions = extract_related_questions(valueserp_response)
-
         # Create Article Content
         header_prompt = prompt_config["prePromptHeader"] 
         #header += "////////////////////////////HEADER////////////////////////////////\n\n"
@@ -193,9 +188,16 @@ def main():
             500,
             general_config["openai_temperature"])
         header += response['choices'][0]['message']['content']
-        print(response['choices'][0]['message']['content'])
+        print(response['choices'][0]['message']['content'] + "\n\n")
+
+
+        # Call the ValueSERP API
+        valueserp_response = call_valueserp_api(api_key=valueserp_api_key, query=QUERY, location=LOCATION)
+        # Extract related questions
+        related_questions = extract_related_questions(valueserp_response)
 
         # Call OpenAI API with valueserp related questions
+        
         prompt = prompt_config["promptBody"].replace("{title}", title)
         print(prompt)
         response= call_openai_api(
@@ -207,7 +209,8 @@ def main():
         body += response['choices'][0]['message']['content']
 
         for question in related_questions:
-            question_prompt = question["question"] + " Use HTML highlight principal key words with bold with <b> </b> and links in HTML pages that are high verified authorities in certain key references. IMPORTANT: DO NOT SAY THAT YOU ARE A LENGUAJE MODEL IN YOUR RESPONSE. MAKE SURE TO NOT MENTION THAT YOU ARE A LENGUAJE MODEL"
+            #question_prompt = question["question"] + " Use HTML highlight principal key words with bold with <b> </b> and links in HTML pages that are high verified authorities in certain key references. IMPORTANT: DO NOT SAY THAT YOU ARE A LENGUAJE MODEL IN YOUR RESPONSE. MAKE SURE TO NOT MENTION THAT YOU ARE A LENGUAJE MODEL"
+            question_prompt = prompt_config["promptValueSerp"].replace("{question}", question["question"])
             print(f"Question: {question['question']}" )
             body += "<h2>"+ question["question"]+ "</h2>\n"
             response = call_openai_api(
@@ -223,7 +226,6 @@ def main():
         #conclusion += "////////////////////////////CONCLUSION////////////////////////////////\n\n"
 
         #+ prompt_config["promptConclusion"]
-        
         prompt = prompt_config["promptConclusion"].replace("{title}", title)
         
         print("conclusion>"+prompt+ "\n\n")
@@ -236,13 +238,7 @@ def main():
         
         conclusion += response['choices'][0]['message']['content']
         print(response['choices'][0]['message']['content'])
-        article_content = header + "\n\n" + body + "\n\n" + conclusion
-        
-        # Save Article in HTML and Markdown format
-        save_article(folder_path, article_id, article_name+"-done", article_content, "html")
-        save_article(folder_path, article_id, article_name+"-done", article_content, "md")
 
-        end_time = datetime.datetime.now()
 
 
 
@@ -258,6 +254,13 @@ def main():
         print("prompt generado para mmirjourney:")
         print(response['choices'][0]['message']['content'])
         imagePromptMidj = response['choices'][0]['message']['content']
+        article_content = header + "\n\n" + body + "\n\n" + conclusion
+        
+        # Save Article in HTML and Markdown format
+        save_article(folder_path, article_id, article_name+"-done", article_content, "html")
+        save_article(folder_path, article_id, article_name+"-done", article_content, "md")
+
+        end_time = datetime.datetime.now()
 
         # Update the CSV summary
         record_data = {
