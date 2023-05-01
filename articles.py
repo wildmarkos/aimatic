@@ -6,12 +6,11 @@ import datetime
 import logging
 import re
 import shutil
-
-
 from pathlib import Path
 from typing import List, Tuple, Dict
 
-
+# check conclusion separator
+# first paragraph sometimes doesnt finish with <-- --> comment in its conclusion 
 
 def read_config(file_name):
     with open(file_name, 'r') as f:
@@ -185,7 +184,7 @@ def main():
             general_config["openai_api_key"],
             prompt,
             general_config["openai_model"],
-            500,
+            900,
             general_config["openai_temperature"])
         header += response['choices'][0]['message']['content']
         print(response['choices'][0]['message']['content'] + "\n\n")
@@ -228,6 +227,7 @@ def main():
         #+ prompt_config["promptConclusion"]
         prompt = prompt_config["promptConclusion"].replace("{title}", title)
         
+        conclusion += "<h2>Conclusion</h2>\n"
         print("conclusion>"+prompt+ "\n\n")
         response = call_openai_api(
             general_config["openai_api_key"],
