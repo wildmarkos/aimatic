@@ -227,8 +227,8 @@ def main():
         #+ prompt_config["promptConclusion"]
         prompt = prompt_config["promptConclusion"].replace("{title}", title)
         
-        conclusion += "<h2>Conclusion</h2>\n"
-        print("conclusion>"+prompt+ "\n\n")
+        conclusion += "<h2>Conclusion</h2>\n\n"
+        print("\n\nconclusion>"+prompt+ "\n\n")
         response = call_openai_api(
             general_config["openai_api_key"],
             prompt,
@@ -254,6 +254,8 @@ def main():
         print("prompt generado para mmirjourney:")
         print(response['choices'][0]['message']['content'])
         imagePromptMidj = response['choices'][0]['message']['content']
+        if imagePromptMidj.endswith('.'):
+            imagePromptMidj = imagePromptMidj[:-1]
         article_content = header + "\n\n" + body + "\n\n" + conclusion
         
         # Save Article in HTML and Markdown format
@@ -278,7 +280,7 @@ def main():
         write_lines("titles.config", titles)
 
         print(f"Article '{title}' has been successfully generated and saved.")
-
+        break;
 if __name__ == "__main__":
     main()
 

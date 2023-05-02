@@ -9,18 +9,22 @@ from selenium.webdriver.support import expected_conditions as EC
 import requests
 from bs4 import BeautifulSoup
 import sys
+import os
+import sys
 
+# Set the working directory to the script's location
+script_directory = os.path.dirname(os.path.abspath(sys.argv[0]))
+os.chdir(script_directory)
 
 """
 TODO:
-UPDATE> # Read tasks from articles_summary.csv only if are not "done", to know read row[11] for "done" only then add to the tasks list
-FEATURE> NEW FUNCIONALLITY TO RUN THE SCRIPT FOREVER AND CHECK EVERY MINUTE IF THERE IS MORE TASKS IN articles_summary.csv THAT NEEDS TO BE ADDED TO tasks variable, make sure to not repeat tasks already loaded.
-FEATURE> WHEN THE IMAGE GENERATION PROCESS IS DONE SAVE IN articles_summary.csv
+UPDATE> # Read tasks from articles_summary.csv only if are not "done", to know read row[11] for "done" only then add to the tasks list. rn it is regenerating the same task when added more tasks to csv
 
 """
 
 # Configuration variables
 TIMEOUT = 9999999999990
+runInTerminal = "false"
 
 
 # Read credentials from settings.conf
@@ -30,30 +34,33 @@ username = config.get("credentials", "username")
 password = config.get("credentials", "password")
 
 # Read tasks from articles_summary.csv if are not done, to know read row[11] for "done" only then add to the tasks list
-tasks = []
-with open("articles_summary.csv", "r", newline="") as csvfile:
-    reader = csv.reader(csvfile)
-    next(reader, None)  # skip the header
+def load_tasks(existing_tasks):
+    new_tasks = []
+    with open(os.path.join(script_directory, "articles_summary.csv"), "r", newline="") as csvfile:
+        reader = csv.reader(csvfile)
+        next(reader, None)  # skip the header
 
-    for row in reader:
-        print(row)
-        print("---------------------------------    -------------------------   --------------------------- ")
-        #print row index and data
-        #for i in range(len(row)):
-            #print(f"adding task, entered for loop and for i in range(len({i}))")
-            #print(i, row[i])
-                    
-        # get row only if doesnt have "done" in row[11] and len(row) >= 2        
-        if row==[] or row[11] == "done":
-            continue
-        else:
-            print("adding task" + row[0])
-            tasks.append({"title": row[0], "folder": row[1], "img1": row[7], "img2": row[8], "img3": row[9], "midPrompt": row[10], "done": row[11]})
-#print number of tasks total
-print(f"total tasks loaded: {len(tasks)}")
+        for row in reader:
+            if row == [] or row[11] == "done":
+                continue
+            else:
+                new_task = {"title": row[0], "folder": row[1], "img1": row[7], "img2": row[8], "img3": row[9], "midPrompt": row[10], "done": row[11], "processed": False}
+                if not any(existing_task['title'] == new_task['title'] and existing_task['folder'] == new_task['folder'] for existing_task in existing_tasks):
+                    new_tasks.append(new_task)
+
+    return new_tasks
+tasks = load_tasks([])
+print(f"Total tasks loaded: {len(tasks)}")
 
 # Initialize Selenium WebDriver
-driver = webdriver.Chrome()
+if(runInTerminal == "true"):
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(options=chrome_options)
+else:
+    driver = webdriver.Chrome()
 driver.get("https://discord.com/login")
 
 # Log in to Discord
@@ -82,87 +89,111 @@ chat_input = WebDriverWait(driver, TIMEOUT).until(EC.element_to_be_clickable((By
 print("Roger that. Path assigned.")
 
 # Iterate through tasks and send prompts
+while True:
 
-for task in tasks:
-    time.sleep(5)
-    print("sleep 5")
-    
-    prompt = task["midPrompt"]
-    print(prompt)
-    print("waiting 5")
-    time.sleep(5)
-    message = f"/imagine {prompt}"
-    for char in message:
-        chat_input.send_keys(char)
-        time.sleep(0.001)  # Adjust the typing speed by changing the sleep time
-    chat_input.send_keys(Keys.ENTER)
-    print("Suenito de 20")
-    time.sleep(20)
-    print("lets go back to work...")
+    if not tasks:
+        print("No new tasks found. Waiting for 10 seconds before checking again.")
+        time.sleep(10)  # Wait for 60 seconds before checking for new tasks
+        continue
 
-    # Wait for the new message in the chat wrapper
-    chat_wrapper_xpath = '/html/body/div[1]/div[2]/div[1]/div[1]/div/div[2]/div/div/div/div/div[3]/div[2]/main/div[1]/div/div/ol'
-    chat_wrapper = WebDriverWait(driver, sys.maxsize).until(EC.presence_of_element_located((By.XPATH, chat_wrapper_xpath)))
-    print("Chat wrapper found.")
-    # Wait for the initial message to be deleted and replaced by the bot
-    WebDriverWait(driver, sys.maxsize).until(
-        lambda driver: len(driver.find_elements(By.XPATH, f"{chat_wrapper_xpath}/li")) > 1)
-    # Save the element containing the buttons
-    buttons_message_xpath = f"{chat_wrapper_xpath}/li"
-    buttons_elements = driver.find_elements(By.XPATH, buttons_message_xpath)
-    buttons_element = buttons_elements[-1]
+    for task in tasks:
 
-    # Click the 3 buttons one after the other
-    for i in range(1, 4):
-        button_xpath = f'/html/body/div[1]/div[2]/div[1]/div[1]/div/div[2]/div/div/div/div/div[3]/div[2]/main/div[1]/div/div/ol/li[{len(buttons_elements)}]/div/div[2]/div[2]/div[1]/div/button[{i}]'
-        WebDriverWait(driver, TIMEOUT).until(EC.element_to_be_clickable((By.XPATH, button_xpath)))
-        button = driver.find_element(By.XPATH, button_xpath)
-        driver.execute_script("arguments[0].click();", button)
-        print(f"Pressed button {i}")
-        time.sleep(3)  # Add a delay between button clicks
-
-    print("dreaming 10s")
-    time.sleep(10)
-    print("end dreaming")
-
-    # Keep track of the number of messages in the chat wrapper
-    current_messages_count = len(driver.find_elements(By.XPATH, f"{chat_wrapper_xpath}/li"))
-    print("current_messages_count")
-    print(current_messages_count)
-
-    # Find the last 3 messages containing the image links
-    image_urls = []
-    for i in range(current_messages_count - 3, current_messages_count):
-        link_xpath = f"{chat_wrapper_xpath}/li[{i + 1}]/div/div[3]/div[1]/div/div/div/div/div/a"
-        link = driver.find_element(By.XPATH, link_xpath)
-        image_url = link.get_attribute("href")
-        if image_url not in image_urls:
-            image_urls.append(image_url)
-            print(f"Found image URL: {image_url}")
-
+        time.sleep(5)
+        print("sleep 5")
         
+        prompt = task["midPrompt"]
+        print(prompt)
+        print("waiting 5")
+        time.sleep(5)
+        message = f"/imagine {prompt}"
+        for char in message:
+            chat_input.send_keys(char)
+            time.sleep(0.001)  # Adjust the typing speed by changing the sleep time
+        chat_input.send_keys(Keys.ENTER)
+        print("Suenito de 20")
+        time.sleep(20)
+        print("lets go back to work...")
 
-    # Save the images in the output folder
-    for i, image_url in enumerate(image_urls):
-        response = requests.get(image_url)
-        if response.status_code == 200:
-            image_name = f"{task[f'img{i+1}']}"
-            with open(f"{task['folder']}/{image_name}", "wb") as output_file:
-                output_file.write(response.content)
-            print(f"Image {i + 1} saved as {image_name}")
+        # Wait for the new message in the chat wrapper
+        chat_wrapper_xpath = '/html/body/div[1]/div[2]/div[1]/div[1]/div/div[2]/div/div/div/div/div[3]/div[2]/main/div[1]/div/div/ol'
+        chat_wrapper = WebDriverWait(driver, sys.maxsize).until(EC.presence_of_element_located((By.XPATH, chat_wrapper_xpath)))
+        print("Chat wrapper found.")
+        # Wait for the initial message to be deleted and replaced by the bot
+        WebDriverWait(driver, sys.maxsize).until(
+            lambda driver: len(driver.find_elements(By.XPATH, f"{chat_wrapper_xpath}/li")) > 1)
+        # Save the element containing the buttons
+        buttons_message_xpath = f"{chat_wrapper_xpath}/li"
+        buttons_elements = driver.find_elements(By.XPATH, buttons_message_xpath)
+        buttons_element = buttons_elements[-1]
 
-    # Mark the task as done in the articles_sumary.csv file in the line that was the current task in row[11]
-    with open( "articles_sumary.csv", "r") as input_file:
-        lines = input_file.readlines()
-    with open("tasks.csv", "w") as output_file:
-        for i, line in enumerate(lines):
-            if i == tasks.index(task):
-                line = line[:-1] + "done"
-                output_file.write(line) 
+        # Click the 3 buttons one after the other
+        for i in range(1, 4):
+            button_xpath = f'/html/body/div[1]/div[2]/div[1]/div[1]/div/div[2]/div/div/div/div/div[3]/div[2]/main/div[1]/div/div/ol/li[{len(buttons_elements)}]/div/div[2]/div[2]/div[1]/div/button[{i}]'
+            WebDriverWait(driver, TIMEOUT).until(EC.element_to_be_clickable((By.XPATH, button_xpath)))
+            button = driver.find_element(By.XPATH, button_xpath)
+            driver.execute_script("arguments[0].click();", button)
+            print(f"Pressed button {i}")
+            time.sleep(3)  # Add a delay between button clicks
+
+        print("dreaming 10s")
+        time.sleep(10)
+        print("end dreaming")
+
+        # Keep track of the number of messages in the chat wrapper
+        current_messages_count = len(driver.find_elements(By.XPATH, f"{chat_wrapper_xpath}/li"))
+        print("current_messages_count")
+        print(current_messages_count)
+
+        # Find the last 3 messages containing the image links
+        image_urls = []
+        for i in range(current_messages_count - 3, current_messages_count):
+            link_xpath = f"{chat_wrapper_xpath}/li[{i + 1}]/div/div[3]/div[1]/div/div/div/div/div/a"
+            link = driver.find_element(By.XPATH, link_xpath)
+            image_url = link.get_attribute("href")
+            if image_url not in image_urls:
+                image_urls.append(image_url)
+                print(f"Found image URL: {image_url}")
+
             
 
+        # Save the images in the output folder
+        for i, image_url in enumerate(image_urls):
+            response = requests.get(image_url)
+            if response.status_code == 200:
+                image_name = f"{task[f'img{i+1}']}"
+                with open(f"{task['folder']}/{image_name}", "wb") as output_file:
+                    output_file.write(response.content)
+                print(f"Image {i + 1} saved as {image_name}")
 
+        # Mark the task as done in the articles_summary.csv file in the line that was the current task in row[11]
+        with open(os.path.join(script_directory, "articles_summary.csv"), "r", newline="") as input_file:
+            reader = csv.reader(input_file)
+            lines = [line for line in reader]
 
-    print("All tasks completed.")
+        with open(os.path.join(script_directory, "articles_summary.csv"), "w", newline="") as output_file:
+            writer = csv.writer(output_file)
+            for i, row in enumerate(lines):
+                if i == 0:  # Write the header as is
+                    writer.writerow(row)
+                    continue
+
+                if row[0] == task['title'] and row[1] == task['folder']:
+                    row[11] = "done"
+                    writer.writerow(row)
+                else:
+                    writer.writerow(row)
+
+     # Check for new tasks every 60 seconds
+    print("Checking for new tasks in 5 seconds...")
+    time.sleep(5)
+    new_tasks = load_tasks(tasks)
+
+    if len(new_tasks) == 0:
+        print("No new tasks found. Continuing to check...")
+    else:
+        tasks.extend(new_tasks)
+        print(f"New tasks found: {len(new_tasks)}. Processing new tasks...")
+    time.sleep(60)
+print("All tasks completed.")
 driver.quit()
 
