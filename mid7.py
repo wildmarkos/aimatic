@@ -11,6 +11,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from termcolor import colored
+from datetime import datetime
 
 
 #todo los prints de list task despues de terminar una tarea esta mal, y no se estàn agregando a done,
@@ -30,18 +31,19 @@ WAIT_AFTER_LOGIN = 15
 BUTTON_DELAY = 3
 WAIT_BETWEEN_PROMPTS = 5
 WAIT_FOR_BOT_RESPONSE = 10
-CHECK_NEW_TASKS_INTERVAL = 60
+CHECK_NEW_TASKS_INTERVAL = 30
 runInTerminal = "false"
 log_file = "midjourney.log"
 
 
 def log_to_console_and_file(message, color=None):
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     with open(log_file, "a") as log:
-        log.write(f"{message}\n")
+        log.write(f"{current_time} - {message}\n")
     if color:
-        print(colored(message, color))
+        print(colored(f"{current_time} - {message}", color))
     else:
-        print(message)
+        print(f"{current_time} - {message}")
 
 def initialize_webdriver(run_in_terminal, username, password):
     if run_in_terminal == "true":
@@ -189,10 +191,10 @@ def process_tasks(driver, tasks, chat_input, current_task_index):
 
     # Iterate through tasks and send prompts
     while True:  # Continue processing while there are tasks in the list
-        print("entro en while")
+        print("Processing tasks...")
 
         # Check for new tasks every CHECK_NEW_TASKS_INTERVAL seconds
-        log_to_console_and_file(f"Validation: CHECK_NEW_TASKS_INTERVAL: {CHECK_NEW_TASKS_INTERVAL}s ...", "yellow")
+        log_to_console_and_file(f"CHECK_NEW_TASKS_INTERVAL wait validation: {CHECK_NEW_TASKS_INTERVAL}s ...", "yellow")
         time.sleep(CHECK_NEW_TASKS_INTERVAL)
         log_to_console_and_file("READING TASKS.........................................", "yellow")
         new_tasks = load_tasks(tasks)

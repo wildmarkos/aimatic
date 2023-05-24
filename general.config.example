@@ -1,6 +1,6 @@
 {
-    "openai_api_key": "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",
-    "valueserp_api_key": "DD0F6064492B418B8288B9F12FE1065E",
+    "openai_api_key": "sk-",
+    "valueserp_api_key": "",
     "openai_model": "gpt-3.5-turbo",
     "openai_max_tokens": 1000,
     "openai_temperature": 0.7,
