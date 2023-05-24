@@ -18,8 +18,7 @@ os.chdir(script_directory)
 
 """
 TODO:
-UPDATE> # Read tasks from articles_summary.csv only if are not "done", to know read row[11] for "done" only then add to the tasks list. rn it is regenerating the same task when added more tasks to csv
-
+UPDATE> bug when adding tasks it doesnt respect the order of the csv file and then when going back breaks 
 """
 
 # Configuration variables
@@ -44,7 +43,7 @@ def load_tasks(existing_tasks):
             if row == [] or row[11] == "done":
                 continue
             else:
-                new_task = {"title": row[0], "folder": row[1], "img1": row[7], "img2": row[8], "img3": row[9], "midPrompt": row[10], "done": row[11], "processed": False}
+                new_task = {"title": row[0], "folder": row[1], "img1": row[7], "img2": row[8], "img3": row[9], "midPrompt": row[10], "done": row[11]}
                 if not any(existing_task['title'] == new_task['title'] and existing_task['folder'] == new_task['folder'] for existing_task in existing_tasks):
                     new_tasks.append(new_task)
 
@@ -87,6 +86,7 @@ chat_input_xpath = '/html/body/div[1]/div[2]/div/div[1]/div/div[2]/div/div[1]/di
 print("Assigning chat input path.")
 chat_input = WebDriverWait(driver, TIMEOUT).until(EC.element_to_be_clickable((By.XPATH, chat_input_xpath)))
 print("Roger that. Path assigned.")
+previous_messages_count = 0
 
 # Iterate through tasks and send prompts
 while True:
@@ -139,8 +139,21 @@ while True:
         time.sleep(10)
         print("end dreaming")
 
-        # Keep track of the number of messages in the chat wrapper
-        current_messages_count = len(driver.find_elements(By.XPATH, f"{chat_wrapper_xpath}/li"))
+        # Wait for the bot's response containing the image URLs
+        print("Waiting for the bot's response...")
+        while True:
+            # Keep track of the number of messages in the chat wrapper
+            current_messages_count = len(driver.find_elements(By.XPATH, f"{chat_wrapper_xpath}/li"))
+            new_messages_count = current_messages_count - previous_messages_count
+
+            # Break the loop when there are enough new messages
+            if new_messages_count >= 3:
+                print("Bot's response received.")
+                break
+
+            # Wait for a short period before checking again
+            time.sleep(1)
+
         print("current_messages_count")
         print(current_messages_count)
 
@@ -182,6 +195,11 @@ while True:
                     writer.writerow(row)
                 else:
                     writer.writerow(row)
+        tasks.remove(task)
+        print(f"Task {task['title']} completed.")
+
+    # Update the previous_messages_count variable
+    previous_messages_count = current_messages_count
 
      # Check for new tasks every 60 seconds
     print("Checking for new tasks in 5 seconds...")
