@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import glob
 import datetime
@@ -10,9 +11,10 @@ from wordpress_xmlrpc.methods.media import UploadFile
 from wordpress_xmlrpc.compat import xmlrpc_client
 from wordpress_xmlrpc.methods.posts import GetPosts
 
-openai_api_key = "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"
-# (create_wordpress_post, upload_images, upload_image, insert_images, and other functions)
-
+def read_config(file_name):
+    with open(file_name, 'r') as f:
+        config = json.load(f)
+    return config
 
 def call_openai_api(api_key, prompt):
     headers = {
@@ -124,7 +126,7 @@ def assign_category(wp, title, category_names, content):
     #print(f"Given the article content #START-POST-CONTENT '{content}' #END-POST-CONTENT, does it fit any of these categories: '{category_names}'? IF YES RESPOND ONLY WITH THE CATEGORY NAME, NO EXTRA TEXT OR BEFORE THE CATEGORY. CANT BE CATEGORY NAMED 'Uncategorized' OR HAVE THE WORD 'category' on it THIS IS VERY IMPORTANT OR GENERATE A NEW ONE THAT FITS. IF NOT FOUND CATEGORY: Find a new one-word (IMPORTANT) BLOG category for the article POST CONTENT I mentioned.")
     
     response = call_openai_api(
-        openai_api_key,
+        general_config["openai_api_key"],
         f"Given the article content #START-POST-CONTENT '{content}' #END-POST-CONTENT, does it fit any of these categories: '{category_names}'? IF YES RESPOND ONLY WITH THE CATEGORY NAME, NO EXTRA TEXT OR BEFORE THE CATEGORY. CANT BE CATEGORY NAMED 'Uncategorized' OR HAVE THE WORD 'category' on it THIS IS VERY IMPORTANT OR GENERATE A NEW ONE THAT FITS. IF NOT FOUND CATEGORY: Find a new one-word (IMPORTANT) BLOG category for the article POST CONTENT I mentioned (text format Capitalized).",
     )
     print("CATEGORIA SELECCIONADA> "+response['choices'][0]['message']['content'])
@@ -137,7 +139,7 @@ def assign_category(wp, title, category_names, content):
 
 def get_tags_from_openai(content, n_tags=7):
     response = call_openai_api(
-        openai_api_key,
+        general_config["openai_api_key"],
         f"Find from MINIMUM 5 to MAX {n_tags} important keywords separated by ',' for the following article: {content}"
     )
     print("tags SELECCIONADos> "+response['choices'][0]['message']['content'])
@@ -231,6 +233,8 @@ def process_articles_folder(articles_folder_path, username, password, url):
 
 
 # Replace these with your WordPress username, password, and URL
+
+general_config = read_config("general.config")
 wordpress_username = 'mark'
 wordpress_password = 'Kore123.--'
 wordpress_url = 'https://blog.quickjobs.app'
